@@ -1,1 +1,48 @@
+初始化项目的提示词：
+你是资深架构师 + 测试负责人 + Tech Writer。请基于以下目录结构生成完整规约文件内容，并确保所有规约可执行、可验收、可持续演进：
 
+.cursor/rules/00-global.mdc
+
+.cursor/rules/01-architecture.mdc
+
+.cursor/rules/02-frontend.mdc
+
+.cursor/rules/03-backend.mdc
+
+.cursor/rules/04-agentos.mdc
+
+.cursor/rules/05-testing.mdc
+
+.cursor/rules/06-decision-tree.mdc
+
+.cursor/rules/project-rule.mdc
+
+memory-bank/00-projectbrief.md
+
+memory-bank/01-productContext.md
+
+memory-bank/02-techContext.md
+
+memory-bank/03-systemPatterns.md
+
+memory-bank/04-activeContext.md
+
+memory-bank/05-progress.md
+
+memory-bank/06-module-registry.md
+
+目标：形成一套遵循 TDD 与 Spec-first 的工程规则，适用于前后端全栈协作，并对 AI/Agent 约束清晰。
+
+输出要求：
+
+逐个文件给出完整内容（包含标题、目的、强制规则 MUST、建议规则 SHOULD、禁止规则 MUST NOT、检查清单 Checklist）。
+
+每个文件都要有“失败处理策略”（例如测试不过怎么处理）。
+
+规约必须规定：Spec 模板、验收标准 AC 模板、测试模板、ADR 模板、PR 模板。
+
+确保规约之间不冲突，并在 project-rule.mdc 给出“本仓库唯一真相（single source of truth）”的索引。
+
+语言：中文为主，关键术语可中英对照。
+
+在生成内容前，先给出本规约体系的“原则列表（不超过10条）”，然后直接输出所有文件内容。
