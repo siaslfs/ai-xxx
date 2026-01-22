@@ -17,6 +17,20 @@
 
 .cursor/rules/project-rule.mdc
 
+docs/analysis
+
+docs/archive
+
+docs/design
+
+docs/devlog
+
+docs/features
+
+docs/guides
+
+docs/review
+
 memory-bank/00-projectbrief.md
 
 memory-bank/01-productContext.md
