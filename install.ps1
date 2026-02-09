@@ -30,7 +30,7 @@
 
 .EXAMPLE
     # Interactive mode:
-    irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.ps1 | iex
+    irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/install.ps1 | iex
 
 .EXAMPLE
     # Non-interactive mode:
@@ -101,7 +101,7 @@ function Show-Banner {
 function Show-Help {
     Show-Banner
     Write-Host "USAGE:" -ForegroundColor White
-    Write-Host "  irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.ps1 | iex" -ForegroundColor Cyan
+    Write-Host "  irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/install.ps1 | iex" -ForegroundColor Cyan
     Write-Host "  .\install.ps1 -BaseUrl 'http://...' -AuthToken 'sk-...'" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "PARAMETERS:" -ForegroundColor White

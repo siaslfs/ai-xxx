@@ -8,10 +8,10 @@
 
 ```bash
 # 交互模式（会提示输入）
-curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/install.sh | bash
 
 # 非交互模式（直接传参）
-curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/install.sh | bash -s -- \
     --base-url http://34.81.219.7:4000 \
     --auth-token sk-your-key-here
 ```
@@ -20,7 +20,7 @@ curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/i
 
 ```powershell
 # 交互模式
-irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.ps1 | iex
+irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/install.ps1 | iex
 
 # 非交互模式
 .\install.ps1 -BaseUrl "http://34.81.219.7:4000" -AuthToken "sk-your-key-here"
@@ -32,7 +32,7 @@ irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.
 ### Windows (CMD)
 
 ```cmd
-powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.ps1 | iex"
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/install.ps1 | iex"
 ```
 
 ## 文件说明
@@ -107,7 +107,7 @@ powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.c
 ### macOS / Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/install.sh | bash -s -- --uninstall
 ```
 
 ### Windows

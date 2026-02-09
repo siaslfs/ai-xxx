@@ -6,13 +6,13 @@
 # appropriate platform-specific installer.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/setup.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/setup.sh | bash -s -- --base-url http://... --auth-token sk-...
+#   curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/setup.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/setup.sh | bash -s -- --base-url http://... --auth-token sk-...
 # ============================================================================
 
 set -euo pipefail
 
-REMOTE_BASE="https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup"
+REMOTE_BASE="https://raw.githubusercontent.com/siaslfs/ai-xxx/main"
 
 detect_platform() {
     local os=""

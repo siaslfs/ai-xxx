@@ -6,8 +6,8 @@ set -euo pipefail
 # Supports: macOS, Linux (Ubuntu, Debian, CentOS, Arch, etc.)
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.sh | bash -s -- \
+#   curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/install.sh | bash -s -- \
 #       --base-url http://34.81.219.7:4000 --auth-token sk-xxxxx
 #
 # What it does:
@@ -63,7 +63,7 @@ EOF
 # ── Usage ────────────────────────────────────────────────────────────────────
 print_usage() {
     echo -e "${BOLD}Usage:${NC}"
-    echo -e "  ${INFO}curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.sh | bash${NC}"
+    echo -e "  ${INFO}curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/install.sh | bash${NC}"
     echo ""
     echo -e "${BOLD}Options:${NC}"
     echo -e "  ${INFO}--base-url${NC} <url>       LiteLLM proxy address (e.g. http://34.81.219.7:4000)"
@@ -76,10 +76,10 @@ print_usage() {
     echo ""
     echo -e "${BOLD}Examples:${NC}"
     echo -e "  ${MUTED}# Interactive mode (will prompt for values):${NC}"
-    echo -e "  curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.sh | bash"
+    echo -e "  curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/install.sh | bash"
     echo ""
     echo -e "  ${MUTED}# Non-interactive mode:${NC}"
-    echo -e "  curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.sh | bash -s -- \\"
+    echo -e "  curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/install.sh | bash -s -- \\"
     echo -e "      --base-url http://34.81.219.7:4000 --auth-token sk-your-key"
     echo ""
 }
@@ -513,7 +513,7 @@ main() {
     if [[ "$os" == "Windows" ]]; then
         log_warn "Detected Windows environment (Git Bash / MSYS / Cygwin)."
         log_info "For native Windows, use the PowerShell script instead:"
-        echo -e "  ${INFO}irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.ps1 | iex${NC}"
+        echo -e "  ${INFO}irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/install.ps1 | iex${NC}"
         echo ""
         if ! prompt_confirm "Continue with shell-based setup anyway?"; then
             exit 0
