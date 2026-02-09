@@ -1,150 +1,129 @@
-# Webhook 服务
+# LiteLLM Proxy Environment Setup
 
-一个使用 Go 语言开发的 Webhook 接收服务，可以接收和打印所有 HTTP 请求信息。
-
-## 功能特性
-
-- ✅ 接收并打印所有请求信息（请求头、查询参数、请求体等）
-- ✅ 支持 JSON 格式的请求和响应
-- ✅ 自动解析 JSON 请求体
-- ✅ 详细的日志输出
-- ✅ 健康检查接口
-
-## 接口说明
-
-### Webhook 接口
-
-- **地址**: `/api/callback`
-- **方法**: 支持所有 HTTP 方法 (GET, POST, PUT, DELETE 等)
-- **请求格式**: 任意格式，建议使用 JSON
-- **响应格式**: JSON
-
-**响应示例**:
-```json
-{
-  "status": "success",
-  "message": "Webhook 接收成功",
-  "timestamp": "2026-01-21 10:30:00",
-  "received": {
-    "method": "POST",
-    "url": "/api/callback?param=value",
-    "headers": {...},
-    "query_params": {...},
-    "body": {...},
-    "remote_addr": "127.0.0.1:12345",
-    "content_length": 123,
-    "host": "localhost:8080"
-  }
-}
-```
-
-### 健康检查接口
-
-- **地址**: `/health`
-- **方法**: GET
-- **响应格式**: JSON
+一键配置 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN` 环境变量的跨平台安装脚本。
 
 ## 快速开始
 
-### 1. 运行服务
+### macOS / Linux / Ubuntu
 
 ```bash
-go run main.go
+# 交互模式（会提示输入）
+curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.sh | bash
+
+# 非交互模式（直接传参）
+curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.sh | bash -s -- \
+    --base-url http://34.81.219.7:4000 \
+    --auth-token sk-your-key-here
 ```
 
-服务将在 `http://localhost:8080` 启动
+### Windows (PowerShell)
 
-### 2. 测试 Webhook
+```powershell
+# 交互模式
+irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.ps1 | iex
 
-使用 curl 发送测试请求：
+# 非交互模式
+.\install.ps1 -BaseUrl "http://34.81.219.7:4000" -AuthToken "sk-your-key-here"
+
+# 系统级别（需要管理员权限）
+.\install.ps1 -Scope Machine -BaseUrl "http://34.81.219.7:4000" -AuthToken "sk-your-key-here"
+```
+
+### Windows (CMD)
+
+```cmd
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.ps1 | iex"
+```
+
+## 文件说明
+
+| 文件 | 平台 | 说明 |
+|------|------|------|
+| `install.sh` | macOS / Linux / Ubuntu | Bash 安装脚本，支持 zsh、bash、fish |
+| `install.ps1` | Windows | PowerShell 安装脚本，支持 User 和 Machine 作用域 |
+| `setup.sh` | 通用入口 | 自动检测平台并分发到对应脚本 |
+
+## 功能特性
+
+**交互式引导**：在未提供参数时，脚本会以友好的交互界面逐步引导用户输入配置值，并提供默认值供快速确认。
+
+**输入验证**：脚本会自动验证 Base URL 是否以 `http://` 或 `https://` 开头，并检查 Auth Token 是否符合 `sk-` 前缀的约定格式。
+
+**连接测试**：配置完成前，脚本会自动尝试连接 LiteLLM 代理服务器的 `/health` 端点，验证服务可达性。
+
+**持久化存储**：环境变量会被写入对应的 Shell 配置文件（如 `.bashrc`、`.zshrc`、PowerShell Profile），确保重启终端后仍然生效。
+
+**安全备份**：在修改任何配置文件之前，脚本会自动创建带时间戳的备份文件，防止意外覆盖。
+
+**Token 脱敏**：在所有输出和摘要中，Auth Token 仅显示前 7 位和后 4 位，中间以 `...` 替代。
+
+## Shell 参数（install.sh）
+
+| 参数 | 说明 |
+|------|------|
+| `--base-url <url>` | LiteLLM 代理地址，如 `http://34.81.219.7:4000` |
+| `--auth-token <token>` | LiteLLM Virtual Key，如 `sk-xxxxx` |
+| `--dry-run` | 仅显示将要执行的操作，不实际修改 |
+| `--uninstall` | 从 Shell 配置文件中移除环境变量 |
+| `--force` | 跳过覆盖确认，直接写入 |
+| `--quiet` | 静默模式，减少输出 |
+| `--help` | 显示帮助信息 |
+
+## PowerShell 参数（install.ps1）
+
+| 参数 | 说明 |
+|------|------|
+| `-BaseUrl <url>` | LiteLLM 代理地址 |
+| `-AuthToken <token>` | LiteLLM Virtual Key |
+| `-Scope <User\|Machine>` | 环境变量作用域，默认 `User` |
+| `-DryRun` | 仅显示将要执行的操作 |
+| `-Uninstall` | 移除环境变量 |
+| `-Force` | 跳过覆盖确认 |
+| `-Quiet` | 静默模式 |
+| `-Help` | 显示帮助信息 |
+
+## 环境变量说明
+
+脚本配置的两个环境变量用于将 Anthropic API 请求透明代理到 LiteLLM 服务器：
+
+| 变量名 | 用途 | 示例值 |
+|--------|------|--------|
+| `ANTHROPIC_BASE_URL` | LiteLLM 代理服务器的 HTTP 地址 | `http://34.81.219.7:4000` |
+| `ANTHROPIC_AUTH_TOKEN` | LiteLLM 分配的 Virtual Key | `sk-1234567890abcdef` |
+
+## Shell 配置文件检测逻辑
+
+脚本会根据当前使用的 Shell 自动选择正确的配置文件：
+
+| Shell | macOS | Linux |
+|-------|-------|-------|
+| zsh | `~/.zshrc` | `~/.zshrc` |
+| bash | `~/.bash_profile` | `~/.bashrc` |
+| fish | `~/.config/fish/config.fish` | `~/.config/fish/config.fish` |
+| 其他 | `~/.profile` | `~/.profile` |
+
+## 卸载
+
+### macOS / Linux
 
 ```bash
-# GET 请求
-curl http://localhost:8080/api/callback?test=123
-
-# POST 请求 (JSON)
-curl -X POST http://localhost:8080/api/callback \
-  -H "Content-Type: application/json" \
-  -d '{"event": "test", "data": {"key": "value"}}'
-
-# POST 请求 (表单数据)
-curl -X POST http://localhost:8080/api/callback \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "field1=value1&field2=value2"
+curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/litellm-setup/install.sh | bash -s -- --uninstall
 ```
 
-### 3. 查看日志
+### Windows
 
-所有接收到的请求信息都会在控制台输出，包括：
-- 请求方法和 URL
-- 所有请求头
-- 查询参数
-- 请求体（原始格式和 JSON 解析后的格式）
-- 完整的请求信息 JSON
-
-## 编译
-
-```bash
-# 编译为可执行文件
-go build -o webhook main.go
-
-# 运行编译后的程序
-./webhook
+```powershell
+.\install.ps1 -Uninstall
 ```
-
-## 环境要求
-
-- Go 1.21 或更高版本
 
 ## 项目结构
 
 ```
-.
-├── main.go        # 主程序文件
-├── go.mod         # Go 模块文件
-├── .gitignore     # Git 忽略文件
-└── README.md      # 项目说明
-```
-
-## 日志示例
-
-当收到 webhook 请求时，控制台会输出类似以下内容：
-
-```
-=== 收到新的 Webhook 请求 ===
-时间: 2026-01-21 10:30:00
-方法: POST
-URL: /api/callback?param=value
-远程地址: 127.0.0.1:12345
-Host: localhost:8080
-Content-Length: 45
-
---- 请求头 ---
-Content-Type: application/json
-User-Agent: curl/7.68.0
-Accept: */*
-
---- 查询参数 ---
-param: [value]
-
---- 请求体 (原始) ---
-{"event":"test","data":{"key":"value"}}
-
---- 请求体 (JSON 解析) ---
-{
-  "event": "test",
-  "data": {
-    "key": "value"
-  }
-}
-
---- 完整请求信息 (JSON) ---
-{
-  "method": "POST",
-  "url": "/api/callback?param=value",
-  ...
-}
-=== Webhook 请求处理完成 ===
+litellm-setup/
+├── install.sh      # macOS / Linux / Ubuntu 安装脚本
+├── install.ps1     # Windows PowerShell 安装脚本
+├── setup.sh        # 通用入口脚本（自动检测平台）
+└── README.md       # 使用文档
 ```
 
 ## 许可证
