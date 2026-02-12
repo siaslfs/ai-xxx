@@ -76,8 +76,6 @@ check_root() {
     if [ "$(id -u)" -ne 0 ]; then
         error "此脚本需要 root 权限，请使用 sudo 执行:"
         printf "\n"
-        printf "    ${BOLD}sudo bash install.sh${RESET}\n"
-        printf "    ${DIM}或${RESET}\n"
         printf "    ${BOLD}curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | sudo bash${RESET}\n"
         printf "\n"
         exit 1
@@ -417,8 +415,6 @@ do_install() {
     printf "\n"
     info "卸载方式:"
     printf "\n"
-    printf "    ${BOLD}sudo bash install.sh --uninstall${RESET}\n"
-    printf "    ${DIM}或${RESET}\n"
     printf "    ${BOLD}curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | sudo bash -s -- --uninstall${RESET}\n"
     printf "\n"
     success "全部完成！"
@@ -444,13 +440,11 @@ main() {
             print_banner
             printf "  ${BOLD}用法:${RESET}\n\n"
             printf "    ${BOLD}安装 (交互式，需要 sudo):${RESET}\n"
-            printf "      sudo bash install.sh\n"
             printf "      curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | sudo bash\n\n"
             printf "    ${BOLD}卸载:${RESET}\n"
-            printf "      sudo bash install.sh --uninstall\n"
             printf "      curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | sudo bash -s -- --uninstall\n\n"
             printf "    ${BOLD}帮助:${RESET}\n"
-            printf "      bash install.sh --help\n\n"
+            printf "      curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | bash -s -- --help\n\n"
             ;;
         ""|--install|-i|install)
             do_install
