@@ -3,19 +3,30 @@
 # LiteLLM Proxy - Environment Configuration Script
 # ============================================================================
 # Usage:
-#   Install (interactive):
-#     curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | bash
-#     wget -qO- https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | bash
+#   Install (interactive, requires sudo):
+#     curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | sudo bash
+#     wget -qO- https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | sudo bash
 #
 #   Uninstall:
-#     curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | bash -s -- --uninstall
-#     wget -qO- https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | bash -s -- --uninstall
+#     curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | sudo bash -s -- --uninstall
+#     wget -qO- https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | sudo bash -s -- --uninstall
 #
 # Supported OS:  Linux (all major distros), macOS, WSL
 # Supported Shell: bash, zsh, fish, ksh
 # ============================================================================
 
 set -e
+
+# ─── Constants ────────────────────────────────────────────────────────────────
+DEFAULT_BASE_URL="https://pool.autelrobotics.com"
+SYSTEM_PROFILE_DIR="/etc/profile.d"
+SYSTEM_CONFIG_FILE="${SYSTEM_PROFILE_DIR}/litellm-proxy.sh"
+FISH_SYSTEM_DIR="/etc/fish/conf.d"
+FISH_CONFIG_FILE="${FISH_SYSTEM_DIR}/litellm-proxy.fish"
+
+# Marker tags used to identify our config block in shell rc files (for cleanup)
+MARKER_BEGIN="# >>> LiteLLM Proxy Environment >>>"
+MARKER_END="# <<< LiteLLM Proxy Environment <<<"
 
 # ─── Color & Style Definitions ──────────────────────────────────────────────
 setup_colors() {
@@ -51,12 +62,7 @@ warn()    { printf "${YELLOW}[WARN]${RESET}    %s\n" "$1"; }
 error()   { printf "${RED}[ERROR]${RESET}   %s\n" "$1"; }
 step()    { printf "\n${BOLD}${CYAN}▶ Step %s: %s${RESET}\n" "$1" "$2"; }
 
-# Marker tags used to identify our config block in shell rc files
-MARKER_BEGIN="# >>> LiteLLM Proxy Environment >>>"
-MARKER_END="# <<< LiteLLM Proxy Environment <<<"
-
 # ─── Trap: Ensure clean exit on interrupt ────────────────────────────────────
-# If the user presses Ctrl+C at any point, nothing is written.
 cleanup() {
     printf "\n"
     warn "操作已被用户中止，所有更改均未生效。"
@@ -65,13 +71,22 @@ cleanup() {
 }
 trap cleanup INT TERM
 
-# ─── Detect Shell & RC File ─────────────────────────────────────────────────
-detect_shell_rc() {
-    # Determine the user's login shell
-    TARGET_SHELL=""
-    RC_FILES=""
+# ─── Check root / sudo ──────────────────────────────────────────────────────
+check_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        error "此脚本需要 root 权限，请使用 sudo 执行:"
+        printf "\n"
+        printf "    ${BOLD}sudo bash install.sh${RESET}\n"
+        printf "    ${DIM}或${RESET}\n"
+        printf "    ${BOLD}curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | sudo bash${RESET}\n"
+        printf "\n"
+        exit 1
+    fi
+}
 
-    # Try $SHELL first, fallback to /etc/passwd
+# ─── Detect Shell (for display only) ────────────────────────────────────────
+detect_shell() {
+    TARGET_SHELL=""
     if [ -n "$SHELL" ]; then
         TARGET_SHELL="$(basename "$SHELL")"
     elif command -v getent >/dev/null 2>&1; then
@@ -79,52 +94,46 @@ detect_shell_rc() {
     else
         TARGET_SHELL="sh"
     fi
+}
 
-    case "$TARGET_SHELL" in
-        bash)
-            # On macOS, bash uses .bash_profile; on Linux, .bashrc
-            if [ "$(uname -s)" = "Darwin" ]; then
-                RC_FILES="$HOME/.bash_profile $HOME/.bashrc"
-            else
-                RC_FILES="$HOME/.bashrc $HOME/.bash_profile"
-            fi
-            ;;
-        zsh)
-            RC_FILES="$HOME/.zshrc $HOME/.zprofile"
-            ;;
-        fish)
-            RC_FILES="$HOME/.config/fish/config.fish"
-            ;;
-        ksh)
-            RC_FILES="$HOME/.kshrc $HOME/.profile"
-            ;;
-        *)
-            RC_FILES="$HOME/.profile"
-            ;;
-    esac
+# ─── Detect user RC files (for cleaning up old config) ──────────────────────
+detect_user_rc_files() {
+    _user_home="${SUDO_USER:+$(eval echo ~"$SUDO_USER")}"
+    [ -z "$_user_home" ] && _user_home="$HOME"
 
-    # Pick the first existing file, or the first candidate if none exist
-    SELECTED_RC=""
-    for f in $RC_FILES; do
-        if [ -f "$f" ]; then
-            SELECTED_RC="$f"
-            break
+    USER_RC_FILES=""
+    for _rc in \
+        "$_user_home/.bashrc" \
+        "$_user_home/.bash_profile" \
+        "$_user_home/.zshrc" \
+        "$_user_home/.zprofile" \
+        "$_user_home/.profile" \
+        "$_user_home/.config/fish/config.fish" \
+        "$_user_home/.kshrc"; do
+        if [ -f "$_rc" ] && grep -qF "$MARKER_BEGIN" "$_rc" 2>/dev/null; then
+            USER_RC_FILES="$USER_RC_FILES $_rc"
         fi
     done
-    if [ -z "$SELECTED_RC" ]; then
-        # Use the first candidate and create it
-        for f in $RC_FILES; do
-            SELECTED_RC="$f"
-            break
-        done
-    fi
+}
+
+# ─── Clean old config from user RC files ─────────────────────────────────────
+cleanup_user_rc() {
+    for _rc in $USER_RC_FILES; do
+        if [ "$(uname -s)" = "Darwin" ]; then
+            sed -i '' "/$MARKER_BEGIN/,/$MARKER_END/d" "$_rc"
+            sed -i '' -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$_rc" 2>/dev/null || true
+        else
+            sed -i "/$MARKER_BEGIN/,/$MARKER_END/d" "$_rc"
+            sed -i -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$_rc" 2>/dev/null || true
+        fi
+        info "已清理旧配置: $_rc"
+    done
 }
 
 # ─── Check if already installed ─────────────────────────────────────────────
 is_installed() {
-    if [ -f "$SELECTED_RC" ] && grep -qF "$MARKER_BEGIN" "$SELECTED_RC" 2>/dev/null; then
-        return 0
-    fi
+    [ -f "$SYSTEM_CONFIG_FILE" ] && return 0
+    [ -f "$FISH_CONFIG_FILE" ] && return 0
     return 1
 }
 
@@ -141,67 +150,41 @@ mask_token() {
     fi
 }
 
-# ─── Write config to RC file ────────────────────────────────────────────────
+# ─── Write config to system files ───────────────────────────────────────────
 write_config() {
-    _base_url="$1"
-    _auth_token="$2"
-    _rc_file="$3"
+    _auth_token="$1"
 
-    # Ensure the directory exists
-    _dir="$(dirname "$_rc_file")"
-    if [ ! -d "$_dir" ]; then
-        mkdir -p "$_dir"
-    fi
-
-    # If already installed, remove old block first
-    if is_installed; then
-        remove_config "$_rc_file"
-    fi
-
-    # Determine export syntax based on shell type
-    if echo "$_rc_file" | grep -q "fish"; then
-        cat >> "$_rc_file" <<EOF
-
+    # Write /etc/profile.d/litellm-proxy.sh (bash/zsh/ksh/sh)
+    mkdir -p "$SYSTEM_PROFILE_DIR"
+    cat > "$SYSTEM_CONFIG_FILE" <<EOF
 $MARKER_BEGIN
 # Managed by LiteLLM Proxy install script — DO NOT EDIT MANUALLY
-set -gx ANTHROPIC_BASE_URL "$_base_url"
-set -gx ANTHROPIC_AUTH_TOKEN "$_auth_token"
+export ANTHROPIC_BASE_URL=$DEFAULT_BASE_URL
+export ANTHROPIC_AUTH_TOKEN=$_auth_token
+export CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1
 $MARKER_END
 EOF
-    else
-        cat >> "$_rc_file" <<EOF
+    chmod 644 "$SYSTEM_CONFIG_FILE"
 
+    # Write fish system config if fish is installed
+    if command -v fish >/dev/null 2>&1; then
+        mkdir -p "$FISH_SYSTEM_DIR"
+        cat > "$FISH_CONFIG_FILE" <<EOF
 $MARKER_BEGIN
 # Managed by LiteLLM Proxy install script — DO NOT EDIT MANUALLY
-export ANTHROPIC_BASE_URL="$_base_url"
-export ANTHROPIC_AUTH_TOKEN="$_auth_token"
+set -gx ANTHROPIC_BASE_URL $DEFAULT_BASE_URL
+set -gx ANTHROPIC_AUTH_TOKEN $_auth_token
+set -gx CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS 1
 $MARKER_END
 EOF
+        chmod 644 "$FISH_CONFIG_FILE"
     fi
 }
 
-# ─── Remove config from RC file ─────────────────────────────────────────────
+# ─── Remove system config files ─────────────────────────────────────────────
 remove_config() {
-    _rc_file="$1"
-
-    if [ ! -f "$_rc_file" ]; then
-        return 0
-    fi
-
-    # Use sed to remove the block between markers (inclusive)
-    # macOS sed requires slightly different syntax
-    if [ "$(uname -s)" = "Darwin" ]; then
-        sed -i '' "/$MARKER_BEGIN/,/$MARKER_END/d" "$_rc_file"
-    else
-        sed -i "/$MARKER_BEGIN/,/$MARKER_END/d" "$_rc_file"
-    fi
-
-    # Clean up any trailing blank lines left behind
-    if [ "$(uname -s)" = "Darwin" ]; then
-        sed -i '' -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$_rc_file" 2>/dev/null || true
-    else
-        sed -i -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$_rc_file" 2>/dev/null || true
-    fi
+    [ -f "$SYSTEM_CONFIG_FILE" ] && rm -f "$SYSTEM_CONFIG_FILE"
+    [ -f "$FISH_CONFIG_FILE" ] && rm -f "$FISH_CONFIG_FILE"
 }
 
 # ─── Uninstall Flow ─────────────────────────────────────────────────────────
@@ -210,25 +193,54 @@ do_uninstall() {
     printf "${BOLD}${RED}  ⚙  卸载模式${RESET}\n"
     printf "  ${DIM}────────────────────────────────────────────${RESET}\n\n"
 
-    detect_shell_rc
+    check_root
+    detect_shell
 
     info "检测到 Shell: ${BOLD}$TARGET_SHELL${RESET}"
-    info "配置文件路径: ${BOLD}$SELECTED_RC${RESET}"
     printf "\n"
 
     if ! is_installed; then
-        warn "未检测到 LiteLLM Proxy 的环境配置，无需卸载。"
-        printf "\n"
-        exit 0
+        # Also check user RC files
+        detect_user_rc_files
+        if [ -z "$USER_RC_FILES" ]; then
+            warn "未检测到 LiteLLM Proxy 的环境配置，无需卸载。"
+            printf "\n"
+            exit 0
+        else
+            info "未检测到系统级配置，但在用户 RC 文件中发现旧配置。"
+        fi
     fi
 
     # Show what will be removed
-    printf "  ${YELLOW}以下内容将从 ${BOLD}$SELECTED_RC${RESET}${YELLOW} 中移除:${RESET}\n\n"
-    printf "  ${DIM}┌──────────────────────────────────────────────┐${RESET}\n"
-    sed -n "/$MARKER_BEGIN/,/$MARKER_END/p" "$SELECTED_RC" | while IFS= read -r line; do
-        printf "  ${DIM}│${RESET} %s\n" "$line"
-    done
-    printf "  ${DIM}└──────────────────────────────────────────────┘${RESET}\n\n"
+    printf "  ${YELLOW}以下系统配置文件将被删除:${RESET}\n\n"
+
+    if [ -f "$SYSTEM_CONFIG_FILE" ]; then
+        printf "  ${DIM}┌──────────────────────────────────────────────┐${RESET}\n"
+        while IFS= read -r line; do
+            printf "  ${DIM}│${RESET} %s\n" "$line"
+        done < "$SYSTEM_CONFIG_FILE"
+        printf "  ${DIM}└──────────────────────────────────────────────┘${RESET}\n"
+        printf "  ${DIM}文件: %s${RESET}\n\n" "$SYSTEM_CONFIG_FILE"
+    fi
+
+    if [ -f "$FISH_CONFIG_FILE" ]; then
+        printf "  ${DIM}┌──────────────────────────────────────────────┐${RESET}\n"
+        while IFS= read -r line; do
+            printf "  ${DIM}│${RESET} %s\n" "$line"
+        done < "$FISH_CONFIG_FILE"
+        printf "  ${DIM}└──────────────────────────────────────────────┘${RESET}\n"
+        printf "  ${DIM}文件: %s${RESET}\n\n" "$FISH_CONFIG_FILE"
+    fi
+
+    # Check for old user RC configs
+    detect_user_rc_files
+    if [ -n "$USER_RC_FILES" ]; then
+        printf "  ${YELLOW}同时将清理以下用户配置文件中的旧配置:${RESET}\n"
+        for _rc in $USER_RC_FILES; do
+            printf "    - %s\n" "$_rc"
+        done
+        printf "\n"
+    fi
 
     printf "${BOLD}${YELLOW}确认卸载? 此操作不可撤销。${RESET}\n"
     printf "请输入 ${BOLD}yes${RESET} 确认卸载: "
@@ -241,18 +253,20 @@ do_uninstall() {
     fi
 
     # Perform removal
-    remove_config "$SELECTED_RC"
+    remove_config
+
+    # Clean user RC files if any
+    if [ -n "$USER_RC_FILES" ]; then
+        cleanup_user_rc
+    fi
 
     printf "\n"
     success "LiteLLM Proxy 环境变量已成功移除！"
     printf "\n"
-    info "请执行以下命令使更改生效，或重新打开终端:"
+    info "新终端将自动生效。当前终端请手动执行:"
     printf "\n"
-    printf "    ${BOLD}source %s${RESET}\n" "$SELECTED_RC"
+    printf "    ${BOLD}unset ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS${RESET}\n"
     printf "\n"
-    # Also unset from current session
-    unset ANTHROPIC_BASE_URL 2>/dev/null || true
-    unset ANTHROPIC_AUTH_TOKEN 2>/dev/null || true
     success "卸载完成！"
     printf "\n"
 }
@@ -263,10 +277,12 @@ do_install() {
     printf "${BOLD}${GREEN}  ⚙  安装模式${RESET}\n"
     printf "  ${DIM}────────────────────────────────────────────${RESET}\n\n"
 
-    # ── Step 1: Environment Detection ──
-    step "1/4" "环境检测"
+    check_root
 
-    detect_shell_rc
+    # ── Step 1: Environment Detection ──
+    step "1/3" "环境检测"
+
+    detect_shell
 
     # Detect OS
     OS_NAME="$(uname -s)"
@@ -278,13 +294,14 @@ do_install() {
         *)        OS_DISPLAY="$OS_NAME" ;;
     esac
 
-    info "操作系统:   ${BOLD}$OS_DISPLAY ($OS_ARCH)${RESET}"
-    info "Shell 类型: ${BOLD}$TARGET_SHELL${RESET}"
-    info "配置文件:   ${BOLD}$SELECTED_RC${RESET}"
+    info "操作系统:     ${BOLD}$OS_DISPLAY ($OS_ARCH)${RESET}"
+    info "Shell 类型:   ${BOLD}$TARGET_SHELL${RESET}"
+    info "系统配置目录: ${BOLD}$SYSTEM_PROFILE_DIR${RESET}"
+    info "BASE_URL:     ${BOLD}$DEFAULT_BASE_URL${RESET} (内置)"
 
     if is_installed; then
         printf "\n"
-        warn "检测到已有 LiteLLM Proxy 配置，继续安装将覆盖旧配置。"
+        warn "检测到已有 LiteLLM Proxy 系统级配置，继续安装将覆盖旧配置。"
         printf "是否继续? [y/N]: "
         read -r _overwrite
         case "$_overwrite" in
@@ -297,49 +314,18 @@ do_install() {
         esac
     fi
 
-    # ── Step 2: Input BASE_URL ──
-    step "2/4" "配置 ANTHROPIC_BASE_URL"
-
-    printf "\n"
-    printf "  ${DIM}LiteLLM 远程服务器地址 (需包含 http:// 或 https:// 前缀)${RESET}\n"
-    printf "  ${DIM}示例: http://34.81.219.7:4000${RESET}\n\n"
-
-    printf "  请输入 ANTHROPIC_BASE_URL: "
-    read -r INPUT_BASE_URL
-
-    # Validate input
-    if [ -z "$INPUT_BASE_URL" ]; then
-        error "BASE_URL 不能为空，安装中止。"
+    # Check for old user-level config
+    detect_user_rc_files
+    if [ -n "$USER_RC_FILES" ]; then
         printf "\n"
-        exit 1
+        warn "检测到用户 RC 文件中存在旧版配置，安装完成后将自动清理:"
+        for _rc in $USER_RC_FILES; do
+            printf "    - %s\n" "$_rc"
+        done
     fi
 
-    # Check for http:// or https:// prefix
-    case "$INPUT_BASE_URL" in
-        http://*|https://*)
-            ;;
-        *)
-            warn "输入的地址缺少 http:// 或 https:// 前缀。"
-            printf "  是否自动添加 ${BOLD}http://${RESET} 前缀? [Y/n]: "
-            read -r _add_prefix
-            case "$_add_prefix" in
-                [nN]|[nN][oO])
-                    error "请输入包含协议前缀的完整地址，安装中止。"
-                    printf "\n"
-                    exit 1
-                    ;;
-                *)
-                    INPUT_BASE_URL="http://$INPUT_BASE_URL"
-                    info "已自动补全为: ${BOLD}$INPUT_BASE_URL${RESET}"
-                    ;;
-            esac
-            ;;
-    esac
-
-    success "ANTHROPIC_BASE_URL 已设置"
-
-    # ── Step 3: Input AUTH_TOKEN ──
-    step "3/4" "配置 ANTHROPIC_AUTH_TOKEN"
+    # ── Step 2: Input AUTH_TOKEN ──
+    step "2/3" "配置 ANTHROPIC_AUTH_TOKEN"
 
     printf "\n"
     printf "  ${DIM}LiteLLM 的 Virtual Key (以 sk- 开头)${RESET}\n\n"
@@ -379,17 +365,18 @@ do_install() {
     MASKED_TOKEN="$(mask_token "$INPUT_AUTH_TOKEN")"
     success "ANTHROPIC_AUTH_TOKEN 已设置"
 
-    # ── Step 4: Confirm & Write ──
-    step "4/4" "确认并写入配置"
+    # ── Step 3: Confirm & Write ──
+    step "3/3" "确认并写入系统配置"
 
     printf "\n"
     printf "  ${BOLD}请确认以下配置信息:${RESET}\n\n"
-    printf "  ┌──────────────────────────────────────────────────────────┐\n"
-    printf "  │  ${BOLD}ANTHROPIC_BASE_URL${RESET}   = %-36s │\n" "$INPUT_BASE_URL"
-    printf "  │  ${BOLD}ANTHROPIC_AUTH_TOKEN${RESET}  = %-36s │\n" "$MASKED_TOKEN"
-    printf "  │                                                        │\n"
-    printf "  │  ${DIM}写入文件: %-44s${RESET} │\n" "$SELECTED_RC"
-    printf "  └──────────────────────────────────────────────────────────┘\n"
+    printf "  ┌──────────────────────────────────────────────────────────────┐\n"
+    printf "  │  ${BOLD}ANTHROPIC_BASE_URL${RESET}                  = %-20s │\n" "$DEFAULT_BASE_URL"
+    printf "  │  ${BOLD}ANTHROPIC_AUTH_TOKEN${RESET}                 = %-20s │\n" "$MASKED_TOKEN"
+    printf "  │  ${BOLD}CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS${RESET} = %-20s │\n" "1"
+    printf "  │                                                              │\n"
+    printf "  │  ${DIM}写入文件: %-48s${RESET} │\n" "$SYSTEM_CONFIG_FILE"
+    printf "  └──────────────────────────────────────────────────────────────┘\n"
     printf "\n"
 
     printf "  ${BOLD}${YELLOW}确认写入以上配置? [y/N]:${RESET} "
@@ -406,22 +393,33 @@ do_install() {
     esac
 
     # Perform the write
-    write_config "$INPUT_BASE_URL" "$INPUT_AUTH_TOKEN" "$SELECTED_RC"
+    write_config "$INPUT_AUTH_TOKEN"
+
+    # Clean up old user RC configs
+    if [ -n "$USER_RC_FILES" ]; then
+        printf "\n"
+        cleanup_user_rc
+    fi
+
+    # Export to current session
+    export ANTHROPIC_BASE_URL=$DEFAULT_BASE_URL
+    export ANTHROPIC_AUTH_TOKEN=$INPUT_AUTH_TOKEN
+    export CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1
 
     printf "\n"
     printf "  ${GREEN}${BOLD}╔══════════════════════════════════════════════════════════╗${RESET}\n"
     printf "  ${GREEN}${BOLD}║                                                        ║${RESET}\n"
-    printf "  ${GREEN}${BOLD}║        ✅  安装成功！配置已写入完成。                    ║${RESET}\n"
+    printf "  ${GREEN}${BOLD}║        ✅  安装成功！配置已写入系统目录。                ║${RESET}\n"
     printf "  ${GREEN}${BOLD}║                                                        ║${RESET}\n"
     printf "  ${GREEN}${BOLD}╚══════════════════════════════════════════════════════════╝${RESET}\n"
     printf "\n"
-    info "请执行以下命令使配置立即生效，或重新打开终端:"
-    printf "\n"
-    printf "    ${BOLD}source %s${RESET}\n" "$SELECTED_RC"
+    info "新打开的终端将自动加载以上环境变量，无需手动 source。"
     printf "\n"
     info "卸载方式:"
     printf "\n"
-    printf "    ${BOLD}curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | bash -s -- --uninstall${RESET}\n"
+    printf "    ${BOLD}sudo bash install.sh --uninstall${RESET}\n"
+    printf "    ${DIM}或${RESET}\n"
+    printf "    ${BOLD}curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | sudo bash -s -- --uninstall${RESET}\n"
     printf "\n"
     success "全部完成！"
     printf "\n"
@@ -434,7 +432,6 @@ main() {
     # Check if stdin is a terminal (needed for interactive input)
     # When piped via curl | bash, we need to read from /dev/tty
     if [ ! -t 0 ]; then
-        # Redirect stdin from /dev/tty for interactive input
         exec < /dev/tty
     fi
 
@@ -446,12 +443,14 @@ main() {
         --help|-h|help)
             print_banner
             printf "  ${BOLD}用法:${RESET}\n\n"
-            printf "    ${BOLD}安装 (交互式):${RESET}\n"
-            printf "      curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | bash\n\n"
+            printf "    ${BOLD}安装 (交互式，需要 sudo):${RESET}\n"
+            printf "      sudo bash install.sh\n"
+            printf "      curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | sudo bash\n\n"
             printf "    ${BOLD}卸载:${RESET}\n"
-            printf "      curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | bash -s -- --uninstall\n\n"
+            printf "      sudo bash install.sh --uninstall\n"
+            printf "      curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | sudo bash -s -- --uninstall\n\n"
             printf "    ${BOLD}帮助:${RESET}\n"
-            printf "      curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.sh | bash -s -- --help\n\n"
+            printf "      bash install.sh --help\n\n"
             ;;
         ""|--install|-i|install)
             do_install
