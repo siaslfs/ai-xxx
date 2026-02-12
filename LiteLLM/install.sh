@@ -242,7 +242,7 @@ do_uninstall() {
 
     printf "${BOLD}${YELLOW}确认卸载? 此操作不可撤销。${RESET}\n"
     printf "请输入 ${BOLD}yes${RESET} 确认卸载: "
-    read -r _confirm
+    read -r _confirm < /dev/tty
 
     if [ "$_confirm" != "yes" ]; then
         warn "卸载已取消，未做任何更改。"
@@ -301,7 +301,7 @@ do_install() {
         printf "\n"
         warn "检测到已有 LiteLLM Proxy 系统级配置，继续安装将覆盖旧配置。"
         printf "是否继续? [y/N]: "
-        read -r _overwrite
+        read -r _overwrite < /dev/tty
         case "$_overwrite" in
             [yY]|[yY][eE][sS]) ;;
             *)
@@ -331,7 +331,7 @@ do_install() {
     # Read token without echo for security
     printf "  请输入 ANTHROPIC_AUTH_TOKEN: "
     stty -echo 2>/dev/null || true
-    read -r INPUT_AUTH_TOKEN
+    read -r INPUT_AUTH_TOKEN < /dev/tty
     stty echo 2>/dev/null || true
     printf "\n"
 
@@ -348,7 +348,7 @@ do_install() {
         *)
             warn "输入的 Token 不以 sk- 开头，请确认是否正确。"
             printf "  是否继续使用该 Token? [y/N]: "
-            read -r _continue_token
+            read -r _continue_token < /dev/tty
             case "$_continue_token" in
                 [yY]|[yY][eE][sS]) ;;
                 *)
@@ -378,7 +378,7 @@ do_install() {
     printf "\n"
 
     printf "  ${BOLD}${YELLOW}确认写入以上配置? [y/N]:${RESET} "
-    read -r _final_confirm
+    read -r _final_confirm < /dev/tty
 
     case "$_final_confirm" in
         [yY]|[yY][eE][sS])
@@ -425,11 +425,8 @@ do_install() {
 main() {
     setup_colors
 
-    # Check if stdin is a terminal (needed for interactive input)
-    # When piped via curl | bash, we need to read from /dev/tty
-    if [ ! -t 0 ]; then
-        exec < /dev/tty
-    fi
+    # All interactive read commands use "< /dev/tty" directly,
+    # so no need to redirect stdin globally.
 
     # Parse arguments
     case "${1:-}" in
