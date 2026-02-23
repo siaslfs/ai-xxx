@@ -4,13 +4,12 @@
 # Usage:
 #   Install (interactive):
 #     irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.ps1 | iex
-#     powershell -ExecutionPolicy Bypass -File install.ps1
 #
 #   Uninstall:
-#     powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall
+#     irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
 #
 #   Help:
-#     powershell -ExecutionPolicy Bypass -File install.ps1 -Help
+#     irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.ps1 -OutFile install.ps1; .\install.ps1 -Help
 #
 # Supported OS:  Windows 10/11, Windows Server 2016+
 # Supported Shell: PowerShell 5.1+, PowerShell Core 7+
@@ -22,6 +21,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# ─── Constants ───────────────────────────────────────────────────────────────
+$DEFAULT_BASE_URL = "https://pool.autelrobotics.com"
 
 # ─── Color & Style Definitions ──────────────────────────────────────────────
 
@@ -83,15 +85,17 @@ function Get-MaskedToken {
 function Test-Installed {
     $baseUrl = [Environment]::GetEnvironmentVariable("ANTHROPIC_BASE_URL", "User")
     $authToken = [Environment]::GetEnvironmentVariable("ANTHROPIC_AUTH_TOKEN", "User")
-    return (-not [string]::IsNullOrEmpty($baseUrl)) -or (-not [string]::IsNullOrEmpty($authToken))
+    $disableBetas = [Environment]::GetEnvironmentVariable("CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS", "User")
+    return (-not [string]::IsNullOrEmpty($baseUrl)) -or (-not [string]::IsNullOrEmpty($authToken)) -or (-not [string]::IsNullOrEmpty($disableBetas))
 }
 
 # ─── Get current config for display ─────────────────────────────────────────
 
 function Get-CurrentConfig {
     return @{
-        BaseUrl   = [Environment]::GetEnvironmentVariable("ANTHROPIC_BASE_URL", "User")
-        AuthToken = [Environment]::GetEnvironmentVariable("ANTHROPIC_AUTH_TOKEN", "User")
+        BaseUrl      = [Environment]::GetEnvironmentVariable("ANTHROPIC_BASE_URL", "User")
+        AuthToken    = [Environment]::GetEnvironmentVariable("ANTHROPIC_AUTH_TOKEN", "User")
+        DisableBetas = [Environment]::GetEnvironmentVariable("CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS", "User")
     }
 }
 
@@ -99,29 +103,28 @@ function Get-CurrentConfig {
 
 function Write-Config {
     param(
-        [string]$BaseUrl,
         [string]$AuthToken
     )
 
-    # Set persistent User-level environment variables (via registry)
-    [Environment]::SetEnvironmentVariable("ANTHROPIC_BASE_URL", $BaseUrl, "User")
+    [Environment]::SetEnvironmentVariable("ANTHROPIC_BASE_URL", $DEFAULT_BASE_URL, "User")
     [Environment]::SetEnvironmentVariable("ANTHROPIC_AUTH_TOKEN", $AuthToken, "User")
+    [Environment]::SetEnvironmentVariable("CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS", "1", "User")
 
-    # Also set in current session so they take effect immediately
-    $env:ANTHROPIC_BASE_URL = $BaseUrl
+    $env:ANTHROPIC_BASE_URL = $DEFAULT_BASE_URL
     $env:ANTHROPIC_AUTH_TOKEN = $AuthToken
+    $env:CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS = "1"
 }
 
 # ─── Remove config ──────────────────────────────────────────────────────────
 
 function Remove-Config {
-    # Remove persistent User-level environment variables
     [Environment]::SetEnvironmentVariable("ANTHROPIC_BASE_URL", $null, "User")
     [Environment]::SetEnvironmentVariable("ANTHROPIC_AUTH_TOKEN", $null, "User")
+    [Environment]::SetEnvironmentVariable("CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS", $null, "User")
 
-    # Remove from current session
     Remove-Item Env:\ANTHROPIC_BASE_URL -ErrorAction SilentlyContinue
     Remove-Item Env:\ANTHROPIC_AUTH_TOKEN -ErrorAction SilentlyContinue
+    Remove-Item Env:\CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS -ErrorAction SilentlyContinue
 }
 
 # ─── Uninstall Flow ─────────────────────────────────────────────────────────
@@ -132,7 +135,6 @@ function Invoke-Uninstall {
     Write-Host "  ────────────────────────────────────────────"
     Write-Host ""
 
-    # Environment info
     Write-Info "Operating System: $([Environment]::OSVersion.VersionString)"
     Write-Info "PowerShell: $($PSVersionTable.PSVersion)"
     Write-Info "Storage: User-level environment variables (Registry)"
@@ -144,19 +146,21 @@ function Invoke-Uninstall {
         return
     }
 
-    # Show what will be removed
     $config = Get-CurrentConfig
     Write-Color "  The following User-level environment variables will be removed:" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "  +──────────────────────────────────────────────────────+"
+    Write-Host "  +──────────────────────────────────────────────────────────────+"
     if ($config.BaseUrl) {
-        Write-Host "  |  ANTHROPIC_BASE_URL   = $($config.BaseUrl)"
+        Write-Host "  |  ANTHROPIC_BASE_URL                  = $($config.BaseUrl)"
     }
     if ($config.AuthToken) {
         $masked = Get-MaskedToken -Token $config.AuthToken
-        Write-Host "  |  ANTHROPIC_AUTH_TOKEN  = $masked"
+        Write-Host "  |  ANTHROPIC_AUTH_TOKEN                 = $masked"
     }
-    Write-Host "  +──────────────────────────────────────────────────────+"
+    if ($config.DisableBetas) {
+        Write-Host "  |  CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS = $($config.DisableBetas)"
+    }
+    Write-Host "  +──────────────────────────────────────────────────────────────+"
     Write-Host ""
 
     Write-Color "Confirm uninstall? This action cannot be undone." -ForegroundColor Yellow
@@ -168,7 +172,6 @@ function Invoke-Uninstall {
         return
     }
 
-    # Perform removal
     Remove-Config
 
     Write-Host ""
@@ -190,7 +193,7 @@ function Invoke-Install {
     Write-Host ""
 
     # ── Step 1: Environment Detection ──
-    Write-Step "1/4" "Environment Detection"
+    Write-Step "1/3" "Environment Detection"
 
     $osInfo = [Environment]::OSVersion
     $arch = if ([Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" }
@@ -199,6 +202,7 @@ function Invoke-Install {
     Write-Info "OS:          Windows $($osInfo.Version) ($arch)"
     Write-Info "PowerShell:  $psVersion"
     Write-Info "Storage:     User-level environment variables (Registry)"
+    Write-Info "BASE_URL:    $DEFAULT_BASE_URL (built-in)"
 
     if (Test-Installed) {
         Write-Host ""
@@ -218,48 +222,14 @@ function Invoke-Install {
         }
     }
 
-    # ── Step 2: Input BASE_URL ──
-    Write-Step "2/4" "Configure ANTHROPIC_BASE_URL"
-
-    Write-Host ""
-    Write-Host "  LiteLLM remote server address (must include http:// or https:// prefix)" -ForegroundColor DarkGray
-    Write-Host "  Example: http://34.81.219.7:4000" -ForegroundColor DarkGray
-    Write-Host ""
-
-    $inputBaseUrl = Read-Host "  Enter ANTHROPIC_BASE_URL"
-
-    # Validate input
-    if ([string]::IsNullOrWhiteSpace($inputBaseUrl)) {
-        Write-Err "BASE_URL cannot be empty. Install aborted."
-        Write-Host ""
-        return
-    }
-
-    # Check for http:// or https:// prefix
-    if ($inputBaseUrl -notmatch "^https?://") {
-        Write-Warn "The entered address is missing the http:// or https:// prefix."
-        $addPrefix = Read-Host "  Auto-add http:// prefix? [Y/n]"
-        if ($addPrefix -match "^[nN]") {
-            Write-Err "Please enter a full address with protocol prefix. Install aborted."
-            Write-Host ""
-            return
-        }
-        $inputBaseUrl = "http://$inputBaseUrl"
-        Write-Info "Auto-completed to: $inputBaseUrl"
-    }
-
-    Write-Success "ANTHROPIC_BASE_URL set"
-
-    # ── Step 3: Input AUTH_TOKEN ──
-    Write-Step "3/4" "Configure ANTHROPIC_AUTH_TOKEN"
+    # ── Step 2: Input AUTH_TOKEN ──
+    Write-Step "2/3" "Configure ANTHROPIC_AUTH_TOKEN"
 
     Write-Host ""
     Write-Host "  LiteLLM Virtual Key (starts with sk-)" -ForegroundColor DarkGray
     Write-Host ""
 
-    # Read token securely (hidden input)
     $secureToken = Read-Host "  Enter ANTHROPIC_AUTH_TOKEN" -AsSecureString
-    # Convert SecureString back to plain text
     $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
     $inputAuthToken = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
     [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
@@ -270,7 +240,6 @@ function Invoke-Install {
         return
     }
 
-    # Validate sk- prefix
     if ($inputAuthToken -notmatch "^sk-") {
         Write-Warn "The entered Token does not start with sk-. Please verify it is correct."
         $continueToken = Read-Host "  Continue with this Token? [y/N]"
@@ -284,18 +253,19 @@ function Invoke-Install {
     $maskedToken = Get-MaskedToken -Token $inputAuthToken
     Write-Success "ANTHROPIC_AUTH_TOKEN set"
 
-    # ── Step 4: Confirm & Write ──
-    Write-Step "4/4" "Confirm and write configuration"
+    # ── Step 3: Confirm & Write ──
+    Write-Step "3/3" "Confirm and write configuration"
 
     Write-Host ""
     Write-Host "  Please confirm the following configuration:" -ForegroundColor White
     Write-Host ""
-    Write-Host "  +──────────────────────────────────────────────────────────+"
-    Write-Host "  |  ANTHROPIC_BASE_URL   = $inputBaseUrl"
-    Write-Host "  |  ANTHROPIC_AUTH_TOKEN  = $maskedToken"
-    Write-Host "  |                                                        "
-    Write-Host "  |  Target: User-level environment variables (Registry)   "
-    Write-Host "  +──────────────────────────────────────────────────────────+"
+    Write-Host "  +──────────────────────────────────────────────────────────────+"
+    Write-Host "  |  ANTHROPIC_BASE_URL                  = $DEFAULT_BASE_URL"
+    Write-Host "  |  ANTHROPIC_AUTH_TOKEN                 = $maskedToken"
+    Write-Host "  |  CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS = 1"
+    Write-Host "  |                                                              "
+    Write-Host "  |  Target: User-level environment variables (Registry)         "
+    Write-Host "  +──────────────────────────────────────────────────────────────+"
     Write-Host ""
 
     Write-Color "  Confirm write? [y/N]: " -ForegroundColor Yellow -NoNewline
@@ -307,8 +277,7 @@ function Invoke-Install {
         return
     }
 
-    # Perform the write
-    Write-Config -BaseUrl $inputBaseUrl -AuthToken $inputAuthToken
+    Write-Config -AuthToken $inputAuthToken
 
     Write-Host ""
     Write-Color "  +==========================================================" -ForegroundColor Green
@@ -320,14 +289,9 @@ function Invoke-Install {
     Write-Info "Environment variables are set for the current session."
     Write-Info "New terminal windows will also inherit these variables."
     Write-Host ""
-    Write-Info "To verify, run:"
-    Write-Host ""
-    Write-Host '    $env:ANTHROPIC_BASE_URL' -ForegroundColor White
-    Write-Host '    $env:ANTHROPIC_AUTH_TOKEN' -ForegroundColor White
-    Write-Host ""
     Write-Info "To uninstall:"
     Write-Host ""
-    Write-Host "    powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall" -ForegroundColor White
+    Write-Host "    irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall" -ForegroundColor White
     Write-Host ""
     Write-Success "All done!"
     Write-Host ""
@@ -340,20 +304,20 @@ function Show-Help {
     Write-Host "  Usage:" -ForegroundColor White
     Write-Host ""
     Write-Host "    Install (interactive):" -ForegroundColor White
-    Write-Host "      powershell -ExecutionPolicy Bypass -File install.ps1"
     Write-Host "      irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.ps1 | iex"
     Write-Host ""
     Write-Host "    Uninstall:" -ForegroundColor White
-    Write-Host "      powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall"
+    Write-Host "      irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall"
     Write-Host ""
     Write-Host "    Help:" -ForegroundColor White
-    Write-Host "      powershell -ExecutionPolicy Bypass -File install.ps1 -Help"
+    Write-Host "      irm https://raw.githubusercontent.com/siaslfs/ai-xxx/main/LiteLLM/install.ps1 -OutFile install.ps1; .\install.ps1 -Help"
     Write-Host ""
     Write-Host "  What this script does:" -ForegroundColor White
     Write-Host ""
     Write-Host "    Sets the following User-level environment variables:"
-    Write-Host "      - ANTHROPIC_BASE_URL    : LiteLLM Proxy server address"
-    Write-Host "      - ANTHROPIC_AUTH_TOKEN   : LiteLLM Virtual Key"
+    Write-Host "      - ANTHROPIC_BASE_URL                  : $DEFAULT_BASE_URL (built-in)"
+    Write-Host "      - ANTHROPIC_AUTH_TOKEN                 : LiteLLM Virtual Key"
+    Write-Host "      - CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS : 1"
     Write-Host ""
     Write-Host "    These are stored in the Windows Registry (HKCU\Environment)"
     Write-Host "    and persist across terminal sessions and reboots."
