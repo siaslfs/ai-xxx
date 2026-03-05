@@ -69,23 +69,38 @@ step "安装飞书"
 if [ -d "/Applications/Lark.app" ] || [ -d "/Applications/飞书.app" ] || [ -d "/Applications/Feishu.app" ]; then
   log "飞书已安装，跳过"
 else
-  log "下载飞书..."
-  curl -fsSL "https://sf3-cn.feishucdn.com/obj/ee-appcenter/5c5f56/Feishu.dmg" -o /tmp/feishu.dmg
+  # 尝试多个已知下载链接
+  FEISHU_URLS=(
+    "https://lf-flow-web-cdn.doubao.com/obj/flow-doubao/doubao/web/pkg/Feishu-mac_universal.dmg"
+    "https://lf3-package.feishucdn.com/package/lark/Feishu-mac_universal.dmg"
+  )
   
-  log "安装中..."
-  hdiutil attach /tmp/feishu.dmg -quiet -nobrowse -mountpoint /tmp/feishu-mount
+  DOWNLOADED=0
+  for URL in "${FEISHU_URLS[@]}"; do
+    log "尝试下载飞书..."
+    if curl -fsSL "${URL}" -o /tmp/feishu.dmg 2>/dev/null; then
+      DOWNLOADED=1
+      break
+    fi
+  done
   
-  # 飞书 dmg 里的 app 名称可能不同
-  FEISHU_APP=$(find /tmp/feishu-mount -maxdepth 1 -name "*.app" | head -1)
-  if [ -n "${FEISHU_APP}" ]; then
-    cp -R "${FEISHU_APP}" /Applications/
-    log "飞书已安装"
+  if [ "${DOWNLOADED}" = "1" ]; then
+    log "安装中..."
+    hdiutil attach /tmp/feishu.dmg -quiet -nobrowse -mountpoint /tmp/feishu-mount
+    
+    FEISHU_APP=$(find /tmp/feishu-mount -maxdepth 1 -name "*.app" | head -1)
+    if [ -n "${FEISHU_APP}" ]; then
+      cp -R "${FEISHU_APP}" /Applications/
+      log "飞书已安装"
+    else
+      warn "未找到 .app 文件，请手动安装"
+    fi
+    
+    hdiutil detach /tmp/feishu-mount -quiet 2>/dev/null || true
+    rm -f /tmp/feishu.dmg
   else
-    warn "飞书 DMG 挂载成功但未找到 .app，请手动安装"
+    warn "飞书自动下载失败，请手动安装: https://www.feishu.cn/download"
   fi
-  
-  hdiutil detach /tmp/feishu-mount -quiet 2>/dev/null || true
-  rm -f /tmp/feishu.dmg
 fi
 
 # ---- Node.js ----
