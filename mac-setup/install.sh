@@ -69,22 +69,10 @@ step "安装飞书"
 if [ -d "/Applications/Lark.app" ] || [ -d "/Applications/飞书.app" ] || [ -d "/Applications/Feishu.app" ]; then
   log "飞书已安装，跳过"
 else
-  # 尝试多个已知下载链接
-  FEISHU_URLS=(
-    "https://lf-flow-web-cdn.doubao.com/obj/flow-doubao/doubao/web/pkg/Feishu-mac_universal.dmg"
-    "https://lf3-package.feishucdn.com/package/lark/Feishu-mac_universal.dmg"
-  )
+  log "下载飞书..."
+  FEISHU_URL="https://github.com/siaslfs/ai-xxx/releases/download/v1.0/Feishu-arm64.dmg"
   
-  DOWNLOADED=0
-  for URL in "${FEISHU_URLS[@]}"; do
-    log "尝试下载飞书..."
-    if curl -fsSL "${URL}" -o /tmp/feishu.dmg 2>/dev/null; then
-      DOWNLOADED=1
-      break
-    fi
-  done
-  
-  if [ "${DOWNLOADED}" = "1" ]; then
+  if curl -fSL "${FEISHU_URL}" -o /tmp/feishu.dmg 2>&1; then
     log "安装中..."
     hdiutil attach /tmp/feishu.dmg -quiet -nobrowse -mountpoint /tmp/feishu-mount
     
@@ -99,7 +87,7 @@ else
     hdiutil detach /tmp/feishu-mount -quiet 2>/dev/null || true
     rm -f /tmp/feishu.dmg
   else
-    warn "飞书自动下载失败，请手动安装: https://www.feishu.cn/download"
+    warn "飞书下载失败，请手动安装: https://www.feishu.cn/download"
   fi
 fi
 
