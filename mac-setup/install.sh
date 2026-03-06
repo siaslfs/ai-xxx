@@ -7,8 +7,11 @@
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/mac-setup/install.sh | bash
 #   
-#   # 带 API Key（Claude Code 免登录）:
-#   curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/mac-setup/install.sh | ANTHROPIC_API_KEY=sk-ant-xxx bash
+#   # 通过 LiteLLM 代理使用（推荐，全自动）:
+#   curl -fsSL ... | LITELLM_API_KEY=sk-xxx bash
+#
+#   # 直连 Anthropic API:
+#   curl -fsSL ... | ANTHROPIC_API_KEY=sk-ant-xxx bash
 # =============================================================
 
 set -euo pipefail
@@ -160,19 +163,45 @@ else
   log "Claude Code $(claude --version 2>/dev/null || echo 'installed')"
 fi
 
-# ---- API Key ----
-if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-  step "配置 Anthropic API Key"
-  
+# ---- LiteLLM 代理 / API Key 配置 ----
+LITELLM_BASE_URL="https://pool.autelrobotics.com"
+
+if [ -n "${LITELLM_API_KEY:-}" ]; then
+  step "配置 LiteLLM 代理模式"
+
+  MARKER_BEGIN="# >>> LiteLLM Proxy Environment >>>"
+  MARKER_END="# <<< LiteLLM Proxy Environment <<<"
+  LITELLM_BLOCK="${MARKER_BEGIN}
+export ANTHROPIC_BASE_URL=\"${LITELLM_BASE_URL}\"
+export ANTHROPIC_AUTH_TOKEN=\"${LITELLM_API_KEY}\"
+export CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1
+${MARKER_END}"
+
   for RC in ~/.zshenv ~/.zshrc ~/.zprofile; do
+    [ ! -f "${RC}" ] && touch "${RC}"
+    if grep -qF "${MARKER_BEGIN}" "${RC}" 2>/dev/null; then
+      sed -i '' "/${MARKER_BEGIN}/,/${MARKER_END}/d" "${RC}"
+    fi
+    printf '\n%s\n' "${LITELLM_BLOCK}" >> "${RC}"
+  done
+
+  log "BASE_URL  = ${LITELLM_BASE_URL}"
+  log "AUTH_TOKEN = ${LITELLM_API_KEY:0:4}****${LITELLM_API_KEY: -4}"
+  log "LiteLLM 代理模式已配置（Claude Code 免登录）"
+
+elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+  step "配置 Anthropic API Key（直连模式）"
+
+  for RC in ~/.zshenv ~/.zshrc ~/.zprofile; do
+    [ ! -f "${RC}" ] && touch "${RC}"
     if ! grep -q 'ANTHROPIC_API_KEY' "${RC}" 2>/dev/null; then
       echo '' >> "${RC}"
       echo '# Anthropic API Key' >> "${RC}"
       echo "export ANTHROPIC_API_KEY=\"${ANTHROPIC_API_KEY}\"" >> "${RC}"
     fi
   done
-  
-  log "API Key 已配置（免登录）"
+
+  log "API Key 已配置（直连模式，免登录）"
 fi
 
 # ---- 完成 ----
@@ -186,7 +215,9 @@ echo -e "    ${BLUE}▸${NC} Google Chrome"
 echo -e "    ${BLUE}▸${NC} 飞书"
 echo -e "    ${BLUE}▸${NC} Node.js $(node -v 2>/dev/null || echo '')"
 echo -e "    ${BLUE}▸${NC} Claude Code"
-if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+if [ -n "${LITELLM_API_KEY:-}" ]; then
+  echo -e "    ${BLUE}▸${NC} LiteLLM 代理 (${LITELLM_BASE_URL}) ✓"
+elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
   echo -e "    ${BLUE}▸${NC} Anthropic API Key ✓"
 fi
 echo ""
