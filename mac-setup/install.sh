@@ -7,11 +7,8 @@
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/siaslfs/ai-xxx/main/mac-setup/install.sh | bash
 #   
-#   # 通过 LiteLLM 代理使用（推荐，全自动）:
+#   # 带 LiteLLM API Key（Claude Code 免登录）:
 #   curl -fsSL ... | LITELLM_API_KEY=sk-xxx bash
-#
-#   # 直连 Anthropic API:
-#   curl -fsSL ... | ANTHROPIC_API_KEY=sk-ant-xxx bash
 # =============================================================
 
 set -euo pipefail
@@ -188,20 +185,6 @@ ${MARKER_END}"
   log "BASE_URL  = ${LITELLM_BASE_URL}"
   log "AUTH_TOKEN = ${LITELLM_API_KEY:0:4}****${LITELLM_API_KEY: -4}"
   log "LiteLLM 代理模式已配置（Claude Code 免登录）"
-
-elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-  step "配置 Anthropic API Key（直连模式）"
-
-  for RC in ~/.zshenv ~/.zshrc ~/.zprofile; do
-    [ ! -f "${RC}" ] && touch "${RC}"
-    if ! grep -q 'ANTHROPIC_API_KEY' "${RC}" 2>/dev/null; then
-      echo '' >> "${RC}"
-      echo '# Anthropic API Key' >> "${RC}"
-      echo "export ANTHROPIC_API_KEY=\"${ANTHROPIC_API_KEY}\"" >> "${RC}"
-    fi
-  done
-
-  log "API Key 已配置（直连模式，免登录）"
 fi
 
 # ---- 完成 ----
@@ -217,8 +200,6 @@ echo -e "    ${BLUE}▸${NC} Node.js $(node -v 2>/dev/null || echo '')"
 echo -e "    ${BLUE}▸${NC} Claude Code"
 if [ -n "${LITELLM_API_KEY:-}" ]; then
   echo -e "    ${BLUE}▸${NC} LiteLLM 代理 (${LITELLM_BASE_URL}) ✓"
-elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-  echo -e "    ${BLUE}▸${NC} Anthropic API Key ✓"
 fi
 echo ""
 echo -e "  ${YELLOW}请重新打开终端使配置生效${NC}"
