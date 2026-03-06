@@ -69,22 +69,34 @@ step "安装飞书"
 if [ -d "/Applications/Lark.app" ] || [ -d "/Applications/飞书.app" ] || [ -d "/Applications/Feishu.app" ]; then
   log "飞书已安装，跳过"
 else
-  log "下载飞书..."
-  FEISHU_URL="https://github.com/siaslfs/ai-xxx/releases/download/v1.0/Feishu-arm64.dmg"
-  
-  if curl -fSL "${FEISHU_URL}" -o /tmp/feishu.dmg 2>&1; then
+  log "获取飞书最新下载地址..."
+  case "${ARCH}" in
+    arm64)  FEISHU_API_KEY="MacOS_m1" ;;
+    x86_64) FEISHU_API_KEY="MacOS" ;;
+  esac
+
+  FEISHU_URL=$(curl -fsSL "https://www.feishu.cn/api/downloads" 2>/dev/null \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['versions']['${FEISHU_API_KEY}']['download_link'])" 2>/dev/null)
+
+  if [ -z "${FEISHU_URL}" ]; then
+    warn "无法获取飞书下载地址，请手动安装: https://www.feishu.cn/download"
+  elif curl -fSL "${FEISHU_URL}" -o /tmp/feishu.dmg 2>&1; then
     log "安装中..."
-    hdiutil attach /tmp/feishu.dmg -quiet -nobrowse -mountpoint /tmp/feishu-mount
-    
-    FEISHU_APP=$(find /tmp/feishu-mount -maxdepth 1 -name "*.app" | head -1)
-    if [ -n "${FEISHU_APP}" ]; then
-      cp -R "${FEISHU_APP}" /Applications/
-      log "飞书已安装"
+    hdiutil attach /tmp/feishu.dmg -quiet -nobrowse
+    FEISHU_VOL=$(find /Volumes -maxdepth 1 -iname "*feishu*" -o -iname "*lark*" -o -iname "*飞书*" 2>/dev/null | head -1)
+
+    if [ -n "${FEISHU_VOL}" ]; then
+      FEISHU_APP=$(find "${FEISHU_VOL}" -maxdepth 1 -name "*.app" | head -1)
+      if [ -n "${FEISHU_APP}" ]; then
+        cp -R "${FEISHU_APP}" /Applications/
+        log "飞书 $(basename "${FEISHU_APP}") 已安装"
+      else
+        warn "DMG 中未找到 .app，请手动安装"
+      fi
+      hdiutil detach "${FEISHU_VOL}" -quiet 2>/dev/null || true
     else
-      warn "未找到 .app 文件，请手动安装"
+      warn "DMG 挂载异常，请手动安装"
     fi
-    
-    hdiutil detach /tmp/feishu-mount -quiet 2>/dev/null || true
     rm -f /tmp/feishu.dmg
   else
     warn "飞书下载失败，请手动安装: https://www.feishu.cn/download"
